@@ -6,6 +6,9 @@ import static javax.security.auth.message.AuthStatus.SUCCESS;
 import static org.omnifaces.security.jaspic.Utils.encodeURL;
 import static org.omnifaces.security.jaspic.Utils.getBaseURL;
 import static org.omnifaces.security.jaspic.core.Jaspic.isAuthenticationRequest;
+import static org.omnifaces.security.jaspic.core.ServiceType.AUTO_REGISTER_SESSION;
+import static org.omnifaces.security.jaspic.core.ServiceType.REMEMBER_ME;
+import static org.omnifaces.security.jaspic.core.ServiceType.SAVE_AND_REDIRECT;
 
 import java.util.logging.Logger;
 
@@ -18,6 +21,7 @@ import org.omnifaces.security.cdi.Beans;
 import org.omnifaces.security.google.oauth.jaspic.user.OAuthClientAuthenticator;
 import org.omnifaces.security.jaspic.core.HttpMsgContext;
 import org.omnifaces.security.jaspic.core.HttpServerAuthModule;
+import org.omnifaces.security.jaspic.core.SamServices;
 import org.omnifaces.security.jaspic.exceptions.ProfileIncompleteException;
 import org.omnifaces.security.jaspic.exceptions.RegistrationException;
 import org.omnifaces.security.jaspic.request.RequestDataDAO;
@@ -26,6 +30,7 @@ import org.omnifaces.security.jaspic.request.StateCookieDAO;
 import com.google.api.client.auth.oauth2.AuthorizationCodeFlow;
 import com.google.api.client.auth.oauth2.TokenResponse;
 
+@SamServices({AUTO_REGISTER_SESSION, SAVE_AND_REDIRECT, REMEMBER_ME})
 public class OAuthClientServerAuthModule extends HttpServerAuthModule {
 
 	private static final Logger logger = Logger.getLogger(OAuthClientServerAuthModule.class.getName());
