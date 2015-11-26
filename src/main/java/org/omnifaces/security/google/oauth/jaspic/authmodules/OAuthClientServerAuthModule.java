@@ -1,5 +1,6 @@
 package org.omnifaces.security.google.oauth.jaspic.authmodules;
 
+import static java.lang.Boolean.TRUE;
 import static javax.security.auth.message.AuthStatus.SEND_CONTINUE;
 import static javax.security.auth.message.AuthStatus.SEND_FAILURE;
 import static javax.security.auth.message.AuthStatus.SUCCESS;
@@ -24,6 +25,7 @@ import org.omnifaces.security.jaspic.core.HttpServerAuthModule;
 import org.omnifaces.security.jaspic.core.SamServices;
 import org.omnifaces.security.jaspic.exceptions.ProfileIncompleteException;
 import org.omnifaces.security.jaspic.exceptions.RegistrationException;
+import org.omnifaces.security.jaspic.request.RememberMeSettingCookieDAO;
 import org.omnifaces.security.jaspic.request.RequestDataDAO;
 import org.omnifaces.security.jaspic.request.StateCookieDAO;
 
@@ -50,6 +52,7 @@ public class OAuthClientServerAuthModule extends HttpServerAuthModule {
 	public String profileIncompleteUrl;
 	public String registrationErrorUrl;
 
+	private RememberMeSettingCookieDAO rememberMeSettingCookieDAO = new RememberMeSettingCookieDAO();
 	private StateCookieDAO stateCookieDAO = new StateCookieDAO();
 	private final RequestDataDAO requestDAO = new RequestDataDAO();
 
@@ -88,11 +91,19 @@ public class OAuthClientServerAuthModule extends HttpServerAuthModule {
 	}
 
 	private boolean isLoginRequest(HttpServletRequest request, HttpServletResponse response, HttpMsgContext httpMsgContext) throws AuthException {
-		// TODO Auto-generated method stub
 
 		if (isAuthenticationRequest(request)) {
 			try {
 				// TODO deal with state and other extra parameters once bug in OmniSecurity is fixed
+
+				Boolean rememberMe = httpMsgContext.getAuthParameters()
+				                                   .getRememberMe();
+				if (TRUE.equals(rememberMe)) {
+					rememberMeSettingCookieDAO.save(request, response, rememberMe);
+				}
+				else if (rememberMeSettingCookieDAO.get(request) != null) {
+					rememberMeSettingCookieDAO.remove(request, response);
+				}
 
 				String authorizationUrl = authorizationCodeFlow.newAuthorizationUrl()
 				                                               .setRedirectUri(getBaseURL(request) + callbackURL)
@@ -113,6 +124,7 @@ public class OAuthClientServerAuthModule extends HttpServerAuthModule {
 		if (request.getRequestURI().equals(callbackURL) && request.getParameter("code") != null) {
 
 			return true;
+
 			// TODO Enable state checking
 //			if (!isEmpty(request.getParameter("state"))) {
 //				try {
@@ -147,10 +159,6 @@ public class OAuthClientServerAuthModule extends HttpServerAuthModule {
 		try {
 			if (authenticator.authenticateOrRegister(tokenResponse)) {
 				httpMsgContext.registerWithContainer(authenticator.getUserName(), authenticator.getApplicationRoles());
-
-				if (!useSessions) {
-					request.getSession().removeAttribute(SOCIAL_PROFILE);
-				}
 
 				return SUCCESS;
 			}
