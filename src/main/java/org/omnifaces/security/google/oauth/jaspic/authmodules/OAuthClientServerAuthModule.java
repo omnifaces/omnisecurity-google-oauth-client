@@ -1,20 +1,24 @@
 package org.omnifaces.security.google.oauth.jaspic.authmodules;
 
 import static java.lang.Boolean.TRUE;
+import static java.util.logging.Level.WARNING;
 import static javax.security.auth.message.AuthStatus.SEND_CONTINUE;
 import static javax.security.auth.message.AuthStatus.SEND_FAILURE;
 import static javax.security.auth.message.AuthStatus.SUCCESS;
 import static org.omnifaces.security.jaspic.Utils.encodeURL;
 import static org.omnifaces.security.jaspic.Utils.getBaseURL;
+import static org.omnifaces.security.jaspic.Utils.isEmpty;
 import static org.omnifaces.security.jaspic.core.Jaspic.isAuthenticationRequest;
 import static org.omnifaces.security.jaspic.core.ServiceType.AUTO_REGISTER_SESSION;
 import static org.omnifaces.security.jaspic.core.ServiceType.REMEMBER_ME;
 import static org.omnifaces.security.jaspic.core.ServiceType.SAVE_AND_REDIRECT;
 
+import java.util.UUID;
 import java.util.logging.Logger;
 
 import javax.security.auth.message.AuthException;
 import javax.security.auth.message.AuthStatus;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -94,10 +98,9 @@ public class OAuthClientServerAuthModule extends HttpServerAuthModule {
 
 		if (isAuthenticationRequest(request)) {
 			try {
-				// TODO deal with state and other extra parameters once bug in OmniSecurity is fixed
-
 				Boolean rememberMe = httpMsgContext.getAuthParameters()
 				                                   .getRememberMe();
+
 				if (TRUE.equals(rememberMe)) {
 					rememberMeSettingCookieDAO.save(request, response, rememberMe);
 				}
@@ -105,7 +108,12 @@ public class OAuthClientServerAuthModule extends HttpServerAuthModule {
 					rememberMeSettingCookieDAO.remove(request, response);
 				}
 
+				String state = UUID.randomUUID().toString();
+
+				stateCookieDAO.save(request, response, state);
+
 				String authorizationUrl = authorizationCodeFlow.newAuthorizationUrl()
+				                                               .setState(state)
 				                                               .setRedirectUri(getBaseURL(request) + callbackURL)
 				                                               .build();
 				response.sendRedirect(authorizationUrl);
@@ -123,27 +131,24 @@ public class OAuthClientServerAuthModule extends HttpServerAuthModule {
 	private boolean isCallbackRequest(HttpServletRequest request, HttpServletResponse response, HttpMsgContext httpMsgContext) throws Exception {
 		if (request.getRequestURI().equals(callbackURL) && request.getParameter("code") != null) {
 
-			return true;
+			if (!isEmpty(request.getParameter("state"))) {
+				try {
+					String state = request.getParameter("state");
+					Cookie cookie = stateCookieDAO.get(request);
 
-			// TODO Enable state checking
-//			if (!isEmpty(request.getParameter("state"))) {
-//				try {
-//					String state = request.getParameter("state");
-//					Cookie cookie = stateCookieDAO.get(request);
-//
-//					if (cookie != null && state.equals(cookie.getValue())) {
-//						return true;
-//					} else {
-//						logger.log(WARNING,
-//							"State parameter provided with callback URL, but did not match cookie. " +
-//							"State param value: " + state + " " +
-//							"Cookie value: " + (cookie == null? "<no cookie>" : cookie.getValue())
-//						);
-//					}
-//				} finally {
-//					stateCookieDAO.remove(request, response);
-//				}
-//			}
+					if (cookie != null && state.equals(cookie.getValue())) {
+						return true;
+					} else {
+						logger.log(WARNING,
+							"State parameter provided with callback URL, but did not match cookie. " +
+							"State param value: " + state + " " +
+							"Cookie value: " + (cookie == null? "<no cookie>" : cookie.getValue())
+						);
+					}
+				} finally {
+					stateCookieDAO.remove(request, response);
+				}
+			}
 		}
 
 		return false;
